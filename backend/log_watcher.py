@@ -16,10 +16,21 @@ _DEBOUNCE_SECONDS = 2.0
 class LogWatcher:
     def __init__(self, log_root: Path = _CLAUDE_LOG_ROOT):
         self.log_root = log_root
-        self.queue: asyncio.Queue[list[dict]] = asyncio.Queue()
+        self._subscribers: list[asyncio.Queue[list[dict]]] = []
         self._main_loop: asyncio.AbstractEventLoop | None = None
         self._last_events: dict[str, float] = {}
         self._seen_counts: dict[str, int] = {}
+
+    def subscribe(self) -> asyncio.Queue[list[dict]]:
+        q: asyncio.Queue[list[dict]] = asyncio.Queue()
+        self._subscribers.append(q)
+        return q
+
+    def unsubscribe(self, q: asyncio.Queue[list[dict]]) -> None:
+        try:
+            self._subscribers.remove(q)
+        except ValueError:
+            pass
 
     def create_lifespan(self):
         @asynccontextmanager
@@ -55,7 +66,8 @@ class LogWatcher:
             return
 
         self._seen_counts[path] = len(trajectory)
-        self._main_loop.call_soon_threadsafe(self.queue.put_nowait, new_steps)
+        for q in list(self._subscribers):
+            self._main_loop.call_soon_threadsafe(q.put_nowait, new_steps)
 
 
 class _LogFileEventHandler(FileSystemEventHandler):

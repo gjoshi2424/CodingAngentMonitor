@@ -1,9 +1,16 @@
+import os
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 load_dotenv()
+
+_cors_origins = [
+    o.strip()
+    for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+]
 
 from log_watcher import LogWatcher
 from parser import load_latest_log
@@ -19,8 +26,8 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
+        allow_origins=_cors_origins,
+        allow_methods=["GET"],
         allow_headers=["*"],
     )
 
@@ -44,10 +51,14 @@ def create_app() -> FastAPI:
     @app.get("/watch")
     async def watch():
         async def _generator():
-            while True:
-                new_steps = await watcher.queue.get()
-                async for chunk in streamer.stream_steps(new_steps):
-                    yield chunk
+            q = watcher.subscribe()
+            try:
+                while True:
+                    new_steps = await q.get()
+                    async for chunk in streamer.stream_steps(new_steps):
+                        yield chunk
+            finally:
+                watcher.unsubscribe(q)
 
         return StreamingResponse(_generator(), media_type="text/event-stream")
 

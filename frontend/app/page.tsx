@@ -123,14 +123,12 @@ export default function Home() {
         {/* Loading state */}
         {isAnalyzing && <Loader />}
 
-        {/* Watching idle state */}
         {isWatching && !isAnalyzing && !isDone && (
           <div className="mb-6 px-4 py-3 rounded-lg bg-violet-900/40 border border-violet-700 text-violet-300 text-sm font-medium">
             Watching ~/.claude/projects/ for changes…
           </div>
         )}
 
-        {/* Done state */}
         {isDone && (
           <div className="mb-6 px-4 py-3 rounded-lg bg-emerald-900/40 border border-emerald-700 text-emerald-300 text-sm font-medium">
             ✓ {analysisMode === "live" ? "Live" : analysisMode === "watch" ? "Watch" : "Mock"} analysis complete
@@ -138,7 +136,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Step cards */}
         <div className="space-y-4">
           {results.map((result, index) => (
             <StepCard key={`${analysisMode}-${result.step}-${index}`} result={result} />

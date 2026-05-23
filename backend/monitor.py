@@ -34,7 +34,7 @@ def judge_step(client: openai.OpenAI, step: dict) -> dict:
     args = step["tool_call"]["args"]
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="llama3.2:latest",
         max_tokens=256,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -83,7 +83,7 @@ def print_result(step: dict, judgment: dict) -> None:
 
 
 def main() -> None:
-    client = openai.OpenAI()
+    client = openai.OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
 
     for step in MOCK_TRAJECTORY:
         judgment = judge_step(client, step)

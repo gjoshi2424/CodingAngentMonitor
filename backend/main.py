@@ -1,14 +1,83 @@
+import asyncio
+import time
+from contextlib import asynccontextmanager
+from pathlib import Path
+
 import openai
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 load_dotenv()
 
 from monitor import judge_step  # noqa: E402
-from parser import load_latest_log  # noqa: E402
+from parser import load_latest_log, parse_jsonl_log  # noqa: E402
 
-app = FastAPI()
+# ---------------------------------------------------------------------------
+# Globals initialised in lifespan startup
+# ---------------------------------------------------------------------------
+log_queue: asyncio.Queue
+_main_loop: asyncio.AbstractEventLoop
+_last_events: dict[str, float] = {}
+
+_CLAUDE_LOG_ROOT = Path.home() / ".claude" / "projects"
+_DEBOUNCE_SECONDS = 2.0
+
+
+# ---------------------------------------------------------------------------
+# Watchdog event handler
+# ---------------------------------------------------------------------------
+class _LogFileEventHandler(FileSystemEventHandler):
+    def on_created(self, event) -> None:
+        self._handle(event)
+
+    def on_modified(self, event) -> None:
+        self._handle(event)
+
+    def _handle(self, event) -> None:
+        if event.is_directory:
+            return
+        path = str(event.src_path)
+        if not path.endswith(".jsonl"):
+            return
+
+        now = time.monotonic()
+        if now - _last_events.get(path, 0.0) < _DEBOUNCE_SECONDS:
+            return
+        _last_events[path] = now
+
+        try:
+            trajectory = parse_jsonl_log(path)
+        except Exception:
+            return
+
+        _main_loop.call_soon_threadsafe(log_queue.put_nowait, trajectory)
+
+
+# ---------------------------------------------------------------------------
+# FastAPI lifespan: start/stop the observer
+# ---------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global log_queue, _main_loop
+
+    log_queue = asyncio.Queue()
+    _main_loop = asyncio.get_event_loop()
+
+    handler = _LogFileEventHandler()
+    observer = Observer()
+    observer.schedule(handler, str(_CLAUDE_LOG_ROOT), recursive=True)
+    observer.start()
+
+    yield
+
+    observer.stop()
+    observer.join()
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,7 +86,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = openai.OpenAI()
+client = openai.OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
 
 
 async def stream_analysis(websocket: WebSocket, trajectory: list[dict]) -> None:
@@ -59,3 +128,15 @@ async def analyze_live(websocket: WebSocket):
 
     trajectory = load_latest_log()
     await stream_analysis(websocket, trajectory)
+
+
+@app.websocket("/ws/watch")
+async def watch(websocket: WebSocket):
+    await websocket.accept()
+
+    try:
+        while True:
+            trajectory = await log_queue.get()
+            await stream_analysis(websocket, trajectory)
+    except Exception:
+        pass

@@ -1,0 +1,31 @@
+# Python
+.env
+.venv/
+__pycache__/
+*.pyc
+
+# Frontend - dependencies
+frontend/node_modules
+
+# Frontend - Next.js build output
+frontend/.next/
+frontend/out/
+frontend/build
+
+# Frontend - testing
+frontend/coverage
+
+# Frontend - env files
+frontend/.env*
+
+# Frontend - vercel
+frontend/.vercel
+
+# Frontend - typescript generated
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+
+# Misc
+.DS_Store
+*.pem
+npm-debug.log*

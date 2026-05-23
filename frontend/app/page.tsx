@@ -56,16 +56,22 @@ export default function Home() {
   const [results, setResults] = useState<StepResult[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDone, setIsDone] = useState(false);
+  const [analysisMode, setAnalysisMode] = useState<"mock" | "live">("mock");
 
-  function runAnalysis() {
+  function runAnalysis(mode: "mock" | "live") {
     setResults([]);
     setIsDone(false);
     setIsAnalyzing(true);
+    setAnalysisMode(mode);
 
-    const ws = new WebSocket("ws://localhost:8000/ws/analyze");
+    const endpoint =
+      mode === "live" ? "/ws/analyze/live" : "/ws/analyze";
+    const ws = new WebSocket(`ws://localhost:8000${endpoint}`);
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ trajectory: MOCK_TRAJECTORY }));
+      if (mode === "mock") {
+        ws.send(JSON.stringify({ trajectory: MOCK_TRAJECTORY }));
+      }
     };
 
     ws.onmessage = (event) => {
@@ -94,7 +100,19 @@ export default function Home() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold tracking-tight">Agent Monitor</h1>
-          <RunButton onClick={runAnalysis} isAnalyzing={isAnalyzing} />
+          <div className="flex items-center gap-3">
+            <RunButton
+              onClick={() => runAnalysis("mock")}
+              isAnalyzing={isAnalyzing}
+            />
+            <button
+              onClick={() => runAnalysis("live")}
+              disabled={isAnalyzing}
+              className="px-5 py-2.5 rounded-lg border border-cyan-500/60 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors cursor-pointer"
+            >
+              {isAnalyzing && analysisMode === "live" ? "Live…" : "Run Live"}
+            </button>
+          </div>
         </div>
 
         {/* Loading state */}
@@ -103,7 +121,7 @@ export default function Home() {
         {/* Done state */}
         {isDone && (
           <div className="mb-6 px-4 py-3 rounded-lg bg-emerald-900/40 border border-emerald-700 text-emerald-300 text-sm font-medium">
-            ✓ Analysis complete
+            ✓ {analysisMode === "live" ? "Live" : "Mock"} analysis complete
           </div>
         )}
 

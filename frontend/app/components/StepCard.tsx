@@ -4,6 +4,13 @@ interface StepCardProps {
   result: StepResult;
 }
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/`([^`]*)`/g, "$1")        // inline code spans
+    .replace(/\*\*([^*]+)\*\*/g, "$1")  // bold
+    .replace(/\*([^*]+)\*/g, "$1");     // italic
+}
+
 export default function StepCard({ result }: StepCardProps) {
   return (
     <div
@@ -46,7 +53,7 @@ export default function StepCard({ result }: StepCardProps) {
           <span className="text-gray-500 text-xs uppercase tracking-wider">
             Reasoning
           </span>
-          <p className="mt-1 text-gray-200">{result.reasoning}</p>
+          <p className="mt-1 text-gray-200">{stripMarkdown(result.reasoning)}</p>
         </div>
         <div>
           <span className="text-gray-500 text-xs uppercase tracking-wider">
@@ -60,7 +67,7 @@ export default function StepCard({ result }: StepCardProps) {
           <span className="text-gray-500 text-xs uppercase tracking-wider">
             Judge
           </span>
-          <p className="mt-1 text-gray-300">{result.explanation}</p>
+          <p className="mt-1 text-gray-300">{stripMarkdown(result.explanation)}</p>
         </div>
       </div>
     </div>

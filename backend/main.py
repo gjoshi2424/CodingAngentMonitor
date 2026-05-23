@@ -101,6 +101,8 @@ async def stream_analysis(websocket: WebSocket, trajectory: list[dict]) -> None:
                 "divergence_score": judgment["divergence_score"],
                 "flagged": judgment["flagged"],
                 "explanation": judgment["explanation"],
+                "rule_name": judgment.get("rule_name"),
+                "severity": judgment.get("severity"),
             }
         )
 

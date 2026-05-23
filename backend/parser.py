@@ -11,6 +11,7 @@ def parse_jsonl_log(file_path: str | Path) -> list[dict[str, Any]]:
     path = Path(file_path).expanduser()
     trajectory: list[dict[str, Any]] = []
     pending_reasoning = ""
+    reasoning_from_thinking = False  # don't let text blocks overwrite thinking
 
     with path.open("r", encoding="utf-8") as handle:
         for line_number, raw_line in enumerate(handle, start=1):
@@ -45,12 +46,16 @@ def parse_jsonl_log(file_path: str | Path) -> list[dict[str, Any]]:
                     text = _coerce_reasoning(block.get("thinking"))
                     if text:
                         pending_reasoning = text
+                        reasoning_from_thinking = True
                     continue
 
                 if block_type == "text":
-                    text = _coerce_reasoning(block.get("text"))
-                    if text:
-                        pending_reasoning = text
+                    # Only capture text-block content when no thinking-based
+                    # reasoning is already pending; thinking takes precedence.
+                    if not reasoning_from_thinking:
+                        text = _coerce_reasoning(block.get("text"))
+                        if text:
+                            pending_reasoning = text
                     continue
 
                 if block_type != "tool_use":
@@ -77,7 +82,9 @@ def parse_jsonl_log(file_path: str | Path) -> list[dict[str, Any]]:
                         },
                     }
                 )
-                pending_reasoning = ""
+                # Don't reset pending_reasoning — it persists until a new
+                # thinking block overrides it, so consecutive tool calls
+                # within the same reasoning context share the same reasoning.
 
     return trajectory
 

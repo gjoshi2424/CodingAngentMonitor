@@ -24,6 +24,7 @@ _last_events: dict[str, float] = {}
 
 _CLAUDE_LOG_ROOT = Path.home() / ".claude" / "projects"
 _DEBOUNCE_SECONDS = 2.0
+_seen_counts: dict[str, int] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -53,7 +54,12 @@ class _LogFileEventHandler(FileSystemEventHandler):
         except Exception:
             return
 
-        _main_loop.call_soon_threadsafe(log_queue.put_nowait, trajectory)
+        prev = _seen_counts.get(path, 0)
+        new_steps = trajectory[prev:]
+        if not new_steps:
+            return
+        _seen_counts[path] = len(trajectory)
+        _main_loop.call_soon_threadsafe(log_queue.put_nowait, new_steps)
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +144,7 @@ async def watch(websocket: WebSocket):
 
     try:
         while True:
-            trajectory = await log_queue.get()
-            await stream_analysis(websocket, trajectory)
+            new_steps = await log_queue.get()
+            await stream_analysis(websocket, new_steps)
     except Exception:
         pass

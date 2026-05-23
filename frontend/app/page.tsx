@@ -119,7 +119,6 @@ export default function Home() {
       }
       if (!watchBatchActive.current) {
         watchBatchActive.current = true;
-        setResults([]);
         setIsDone(false);
         setIsAnalyzing(true);
       }

@@ -5,10 +5,10 @@ from fastapi.responses import StreamingResponse
 
 load_dotenv()
 
-from log_watcher import LogWatcher  # noqa: E402
-from parser import load_latest_log  # noqa: E402
-from streaming import TrajectoryStreamer  # noqa: E402
-from trajectory import MOCK_TRAJECTORY  # noqa: E402
+from log_watcher import LogWatcher
+from parser import load_latest_log
+from streaming import TrajectoryStreamer
+from trajectory import MOCK_TRAJECTORY
 
 watcher = LogWatcher()
 streamer = TrajectoryStreamer()

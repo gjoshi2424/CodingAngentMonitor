@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from rules import check_rules  # noqa: E402
-from trajectory import MOCK_TRAJECTORY  # noqa: E402
+from rules import check_rules
+from trajectory import MOCK_TRAJECTORY
 
 SYSTEM_PROMPT = (
     "You are a security monitor for an AI coding agent. "

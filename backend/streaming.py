@@ -3,6 +3,7 @@ import json
 
 import openai
 
+import db
 from monitor import judge_step
 
 
@@ -12,12 +13,22 @@ class TrajectoryStreamer:
             base_url="http://localhost:11434/v1", api_key="ollama"
         )
 
-    async def stream_steps(self, trajectory: list[dict]):
+    async def stream_steps(
+        self,
+        trajectory: list[dict],
+        source: str,
+        log_path: str | None = None,
+    ):
+        session_id = await db.create_session(source, log_path)
+
         for step in trajectory:
             judgment = await asyncio.to_thread(judge_step, self.client, step)
-            yield f"data: {json.dumps(_build_payload(step, judgment))}\n\n"
+            payload = _build_payload(step, judgment)
+            await db.save_step(session_id, payload)
+            yield f"data: {json.dumps(payload)}\n\n"
 
-        yield 'data: {"done": true}\n\n'
+        await db.close_session(session_id)
+        yield f"data: {json.dumps({'done': True, 'session_id': session_id})}\n\n"
 
 
 def _build_payload(step: dict, judgment: dict) -> dict:

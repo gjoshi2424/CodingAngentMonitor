@@ -90,11 +90,11 @@ def parse_jsonl_log(file_path: str | Path) -> list[dict[str, Any]]:
 
 
 def load_latest_log() -> list[dict[str, Any]]:
-    latest_log = _find_latest_log_file()
+    latest_log = find_latest_log_file()
     return parse_jsonl_log(latest_log)
 
 
-def _find_latest_log_file() -> Path:
+def find_latest_log_file() -> Path:
     log_root = _resolve_log_root()
     log_files = [path for path in log_root.rglob("*.jsonl") if path.is_file()]
 

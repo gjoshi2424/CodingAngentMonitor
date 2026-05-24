@@ -1,7 +1,9 @@
 import asyncio
 import time
+from collections.abc import Callable, Coroutine
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from watchdog.events import FileSystemEventHandler
@@ -12,29 +14,38 @@ from parser import parse_jsonl_log
 _CLAUDE_LOG_ROOT = Path.home() / ".claude" / "projects"
 _DEBOUNCE_SECONDS = 2.0
 
+# Queue items are (new_steps, log_path) tuples so consumers know the source file.
+_QueueItem = tuple[list[dict], str]
+
 
 class LogWatcher:
     def __init__(self, log_root: Path = _CLAUDE_LOG_ROOT):
         self.log_root = log_root
-        self._subscribers: list[asyncio.Queue[list[dict]]] = []
+        self._subscribers: list[asyncio.Queue[_QueueItem]] = []
         self._main_loop: asyncio.AbstractEventLoop | None = None
         self._last_events: dict[str, float] = {}
         self._seen_counts: dict[str, int] = {}
 
-    def subscribe(self) -> asyncio.Queue[list[dict]]:
-        q: asyncio.Queue[list[dict]] = asyncio.Queue()
+    def subscribe(self) -> asyncio.Queue[_QueueItem]:
+        q: asyncio.Queue[_QueueItem] = asyncio.Queue()
         self._subscribers.append(q)
         return q
 
-    def unsubscribe(self, q: asyncio.Queue[list[dict]]) -> None:
+    def unsubscribe(self, q: asyncio.Queue[_QueueItem]) -> None:
         try:
             self._subscribers.remove(q)
         except ValueError:
             pass
 
-    def create_lifespan(self):
+    def create_lifespan(
+        self,
+        on_startup: Callable[[], Coroutine[Any, Any, None]] | None = None,
+    ):
         @asynccontextmanager
         async def lifespan(app: FastAPI):
+            if on_startup is not None:
+                await on_startup()
+
             self._main_loop = asyncio.get_running_loop()
 
             handler = _LogFileEventHandler(self)
@@ -67,7 +78,7 @@ class LogWatcher:
 
         self._seen_counts[path] = len(trajectory)
         for q in list(self._subscribers):
-            self._main_loop.call_soon_threadsafe(q.put_nowait, new_steps)
+            self._main_loop.call_soon_threadsafe(q.put_nowait, (new_steps, path))
 
 
 class _LogFileEventHandler(FileSystemEventHandler):

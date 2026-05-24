@@ -15,4 +15,16 @@ export interface StepResult {
   divergence_score: number;
   flagged: boolean;
   explanation: string;
+  rule_name?: string;
+  severity?: string;
+}
+
+export interface Session {
+  id: number;
+  source: string;
+  log_path: string | null;
+  started_at: string;
+  completed_at: string | null;
+  total_steps: number;
+  flagged_count: number;
 }

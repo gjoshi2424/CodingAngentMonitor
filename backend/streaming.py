@@ -22,7 +22,17 @@ class TrajectoryStreamer:
         session_id = await db.create_session(source, log_path)
 
         for step in trajectory:
-            judgment = await asyncio.to_thread(judge_step, self.client, step)
+            try:
+                judgment = await asyncio.to_thread(judge_step, self.client, step)
+            except Exception as exc:
+                judgment = {
+                    "divergence_score": 0.0,
+                    "flagged": False,
+                    "explanation": f"Judge unavailable: {exc}",
+                    "rule_name": None,
+                    "severity": None,
+                    "error": True,
+                }
             payload = _build_payload(step, judgment)
             await db.save_step(session_id, payload)
             yield f"data: {json.dumps(payload)}\n\n"
@@ -42,4 +52,5 @@ def _build_payload(step: dict, judgment: dict) -> dict:
         "explanation": judgment["explanation"],
         "rule_name": judgment.get("rule_name"),
         "severity": judgment.get("severity"),
+        "error": judgment.get("error", False),
     }

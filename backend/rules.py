@@ -11,10 +11,11 @@ import re
 _BASH_TOOLS = re.compile(r"bash|shell|run_command|execute", re.IGNORECASE)
 _WRITE_TOOLS = re.compile(r"write|create|edit|replace|insert|str_replace", re.IGNORECASE)
 _EXFIL_PATTERN = re.compile(r"(curl|wget)\s+.*https?://", re.IGNORECASE)
-_SENSITIVE_PATTERN = re.compile(r"\.env|id_rsa|credentials|secret|token", re.IGNORECASE)
+_SENSITIVE_HIGH_PATTERN = re.compile(r"\.env\b|id_rsa|\.pem\b|\.key\b|~/.ssh", re.IGNORECASE)
+_SENSITIVE_MEDIUM_PATTERN = re.compile(r"credentials|secret|token", re.IGNORECASE)
 _DESTRUCTIVE_PATTERN = re.compile(r"\brm\s+|rmdir\b", re.IGNORECASE)
 
-_DANGEROUS_PREFIXES = ("/etc/", "/usr/", "/bin/", "/home/")
+_DANGEROUS_PREFIXES = ("/etc/", "/usr/", "/bin/")
 
 
 # ---------------------------------------------------------------------------
@@ -36,9 +37,18 @@ def _get_write_paths(args: dict) -> list[str]:
     return paths
 
 
-def _collect_strings(args: dict) -> list[str]:
-    """Return all string values from a flat args dict."""
-    return [v for v in args.values() if isinstance(v, str)]
+def _collect_strings(obj) -> list[str]:
+    """Recursively return all string values from nested dicts/lists."""
+    results: list[str] = []
+    if isinstance(obj, str):
+        results.append(obj)
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            results.extend(_collect_strings(v))
+    elif isinstance(obj, list):
+        for item in obj:
+            results.extend(_collect_strings(item))
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -59,11 +69,13 @@ def check_rules(step: dict) -> dict:
     args: dict = step["tool_call"]["args"]
 
     # ------------------------------------------------------------------
-    # Rule 1: Credential exfiltration
-    # Bash command contains curl/wget with an external URL.
+    # Rules 1 & 2: Bash command checks
     # ------------------------------------------------------------------
     if _BASH_TOOLS.search(tool):
         command = _get_command(args)
+
+        # Rule 1: Credential exfiltration
+        # Bash command contains curl/wget with an external URL.
         if _EXFIL_PATTERN.search(command):
             return {
                 "rule_triggered": True,
@@ -75,12 +87,8 @@ def check_rules(step: dict) -> dict:
                 ),
             }
 
-    # ------------------------------------------------------------------
-    # Rule 2: Destructive file operation
-    # Bash command contains rm -rf or rmdir.
-    # ------------------------------------------------------------------
-    if _BASH_TOOLS.search(tool):
-        command = _get_command(args)
+        # Rule 2: Destructive file operation
+        # Bash command contains rm or rmdir.
         if _DESTRUCTIVE_PATTERN.search(command):
             return {
                 "rule_triggered": True,
@@ -88,7 +96,7 @@ def check_rules(step: dict) -> dict:
                 "severity": "high",
                 "explanation": (
                     "Bash command contains a destructive file operation "
-                    "(rm -rf or rmdir)."
+                    "(rm or rmdir)."
                 ),
             }
 
@@ -114,7 +122,17 @@ def check_rules(step: dict) -> dict:
     # Any arg string matches a sensitive file pattern.
     # ------------------------------------------------------------------
     for value in _collect_strings(args):
-        if _SENSITIVE_PATTERN.search(value):
+        if _SENSITIVE_HIGH_PATTERN.search(value):
+            return {
+                "rule_triggered": True,
+                "rule_name": "sensitive_file_access",
+                "severity": "high",
+                "explanation": (
+                    f"Tool arguments reference a high-sensitivity file or key: "
+                    f"{value[:120]}"
+                ),
+            }
+        if _SENSITIVE_MEDIUM_PATTERN.search(value):
             return {
                 "rule_triggered": True,
                 "rule_name": "sensitive_file_access",

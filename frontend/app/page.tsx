@@ -12,6 +12,7 @@ export default function Home() {
   const [results, setResults] = useState<StepResult[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDone, setIsDone] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [analysisMode, setAnalysisMode] = useState<"mock" | "live" | "watch">("mock");
   const [isWatching, setIsWatching] = useState(false);
   const watchEsRef = useRef<EventSource | null>(null);
@@ -54,6 +55,7 @@ export default function Home() {
     setResults([]);
     setIsDone(false);
     setIsAnalyzing(true);
+    setErrorMessage(null);
     setAnalysisMode(mode);
     setSelectedSession(null);
 
@@ -74,6 +76,7 @@ export default function Home() {
 
     es.onerror = () => {
       setIsAnalyzing(false);
+      setErrorMessage("Connection to the backend failed. Is the server running?");
       es.close();
     };
   }
@@ -83,6 +86,7 @@ export default function Home() {
     setResults([]);
     setIsDone(false);
     setIsAnalyzing(false);
+    setErrorMessage(null);
     setAnalysisMode("watch");
     setIsWatching(true);
     setSelectedSession(null);
@@ -108,7 +112,10 @@ export default function Home() {
       setResults((prev) => [...prev, data as StepResult]);
     };
 
-    es.onerror = () => stopWatch();
+    es.onerror = () => {
+      setErrorMessage("Watch connection lost. Is the backend still running?");
+      stopWatch();
+    };
   }
 
   function stopWatch() {
@@ -164,6 +171,12 @@ export default function Home() {
 
         {/* Loading state */}
         {isAnalyzing && <Loader />}
+
+        {errorMessage && (
+          <div className="mb-6 px-4 py-3 rounded-lg bg-yellow-900/40 border border-yellow-700 text-yellow-300 text-sm font-medium">
+            ⚠ {errorMessage}
+          </div>
+        )}
 
         {isWatching && !isAnalyzing && !isDone && (
           <div className="mb-6 px-4 py-3 rounded-lg bg-violet-900/40 border border-violet-700 text-violet-300 text-sm font-medium">

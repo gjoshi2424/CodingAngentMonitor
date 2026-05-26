@@ -17,6 +17,7 @@ export interface StepResult {
   explanation: string;
   rule_name?: string;
   severity?: string;
+  error?: boolean;
 }
 
 export interface Session {

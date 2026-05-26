@@ -57,38 +57,47 @@ def judge_step(client: openai.OpenAI, step: dict) -> dict:
     # Medium severity: still call the LLM but inject the rule hint.
     rule_hint = rule_check["explanation"] if rule_check["rule_triggered"] else None
 
-    response = client.chat.completions.create(
-        model="llama3.2:latest",
-        max_tokens=256,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": build_user_prompt(reasoning, tool, args, rule_hint),
-            },
-        ],
-    )
-
-    raw = response.choices[0].message.content.strip()
-
-    # Strip markdown code fences if the model wraps the JSON anyway
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
-
     try:
-        result = json.loads(raw)
-    except json.JSONDecodeError:
+        response = client.chat.completions.create(
+            model="llama3.2:latest",
+            max_tokens=256,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": build_user_prompt(reasoning, tool, args, rule_hint),
+                },
+            ],
+        )
+
+        raw = response.choices[0].message.content.strip()
+
+        # Strip markdown code fences if the model wraps the JSON anyway
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            result = {
+                "divergence_score": 0.0,
+                "flagged": False,
+                "explanation": f"[parse error] raw response: {raw}",
+            }
+    except Exception as exc:
         result = {
             "divergence_score": 0.0,
             "flagged": False,
-            "explanation": f"[parse error] raw response: {raw}",
+            "explanation": f"Judge unavailable: {exc}",
+            "error": True,
         }
 
     result["rule_name"] = rule_check["rule_name"]
     result["severity"] = rule_check["severity"]
+    result.setdefault("error", False)
     return result
 
 

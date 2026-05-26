@@ -15,7 +15,9 @@ export default function StepCard({ result }: StepCardProps) {
   return (
     <div
       className={`rounded-xl border p-5 ${
-        result.flagged
+        result.error
+          ? "border-yellow-700 bg-yellow-950/30"
+          : result.flagged
           ? "border-red-700 bg-red-950/30"
           : "border-gray-700 bg-gray-900"
       }`}
@@ -25,7 +27,11 @@ export default function StepCard({ result }: StepCardProps) {
         <span className="text-sm font-semibold text-gray-400">
           Step {result.step}
         </span>
-        {result.flagged ? (
+        {result.error ? (
+          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-700 text-white">
+            JUDGE ERROR
+          </span>
+        ) : result.flagged ? (
           <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-600 text-white">
             FLAGGED
           </span>

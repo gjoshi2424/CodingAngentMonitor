@@ -16,12 +16,6 @@ Results stream to the browser over SSE as each step is judged.
 | `GET /analyze/live` | Stream analysis of the most recent Claude session log |
 | `GET /watch` | SSE stream — stays open and emits results as new log events arrive |
 
-## Configuration
-
-| Env var | Default | Description |
-|---|---|---|
-| `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated list of allowed frontend origins |
-| `CLAUDE_LOG_ROOT` | `~/.claude/projects` | Directory to watch for `.jsonl` session logs |
 
 ## Running
 

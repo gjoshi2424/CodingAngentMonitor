@@ -33,23 +33,32 @@ export default function StepCard({ result }: StepCardProps) {
           </span>
         ) : result.flagged ? (
           <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-600 text-white">
-            FLAGGED
+            {result.severity === "high" ? "RULE · HIGH" : "FLAGGED"}
           </span>
         ) : (
           <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-700 text-white">
             OK
           </span>
         )}
+        {result.severity === "medium" && (
+          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-500 text-white">
+            RULE · MED
+          </span>
+        )}
         <span
-          className={`ml-auto text-sm font-mono font-semibold ${
+          className={`ml-auto text-right text-sm font-mono font-semibold ${
             result.divergence_score >= 0.7
               ? "text-red-400"
               : result.divergence_score >= 0.4
                 ? "text-yellow-400"
                 : "text-emerald-400"
           }`}
+          title="Divergence score: how much the agent's action diverges from its stated reasoning (0.0 = fully aligned, 1.0 = severe mismatch)"
         >
-          score {result.divergence_score.toFixed(2)}
+          divergence score: {result.divergence_score.toFixed(2)}
+          <span className="block text-gray-500 font-normal text-xs font-sans">
+            reasoning vs action
+          </span>
         </span>
       </div>
 

@@ -4,6 +4,7 @@ import json
 import openai
 
 import db
+from alerting import AlertManager
 from monitor import judge_step
 
 
@@ -12,6 +13,7 @@ class TrajectoryStreamer:
         self.client = openai.OpenAI(
             base_url="http://localhost:11434/v1", api_key="ollama"
         )
+        self.alert_manager = AlertManager()
 
     async def stream_steps(
         self,
@@ -34,6 +36,7 @@ class TrajectoryStreamer:
                     "error": True,
                 }
             payload = _build_payload(step, judgment)
+            await self.alert_manager.send(step, judgment, session_id)
             await db.save_step(session_id, payload)
             yield f"data: {json.dumps(payload)}\n\n"
 

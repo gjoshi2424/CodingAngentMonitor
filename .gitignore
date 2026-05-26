@@ -25,6 +25,7 @@ frontend/.vercel
 frontend/*.tsbuildinfo
 frontend/next-env.d.ts
 
+backend/agent_monitor.db
 # Misc
 .DS_Store
 *.pem

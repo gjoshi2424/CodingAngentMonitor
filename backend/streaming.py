@@ -1,11 +1,14 @@
 import asyncio
 import json
+import logging
 
 import openai
 
 import db
 from alerting import AlertManager
 from monitor import judge_step
+
+logger = logging.getLogger(__name__)
 
 
 class TrajectoryStreamer:
@@ -22,11 +25,13 @@ class TrajectoryStreamer:
         log_path: str | None = None,
     ):
         session_id = await db.create_session(source, log_path)
+        logger.info("Session %d started: source=%s log_path=%s", session_id, source, log_path)
 
         for step in trajectory:
             try:
                 judgment = await asyncio.to_thread(judge_step, self.client, step)
             except Exception as exc:
+                logger.warning("Judge unavailable for step %d: %s", step["step"], exc)
                 judgment = {
                     "divergence_score": 0.0,
                     "flagged": False,
@@ -35,12 +40,28 @@ class TrajectoryStreamer:
                     "severity": None,
                     "error": True,
                 }
+            logger.info(
+                "Step %d processed: tool=%s score=%.2f flagged=%s",
+                step["step"],
+                step["tool_call"]["tool"],
+                judgment["divergence_score"],
+                judgment["flagged"],
+            )
+            if judgment["flagged"]:
+                logger.warning(
+                    "Step %d flagged: rule=%s severity=%s score=%.2f",
+                    step["step"],
+                    judgment.get("rule_name"),
+                    judgment.get("severity"),
+                    judgment["divergence_score"],
+                )
             payload = _build_payload(step, judgment)
             await self.alert_manager.send(step, judgment, session_id)
             await db.save_step(session_id, payload)
             yield f"data: {json.dumps(payload)}\n\n"
 
         await db.close_session(session_id)
+        logger.info("Session %d closed", session_id)
         yield f"data: {json.dumps({'done': True, 'session_id': session_id})}\n\n"
 
 

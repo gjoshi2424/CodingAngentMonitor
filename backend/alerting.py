@@ -47,6 +47,7 @@ class AlertManager:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.post(self._webhook_url, json=payload)
                 response.raise_for_status()
+                logger.info("Slack alert sent: rule=%s step=%s session=%s", rule_name, step.get("step"), session_id)
         except Exception as exc:
             logger.error("Slack alert failed: %s", exc)
 

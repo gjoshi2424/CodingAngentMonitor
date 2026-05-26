@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 from collections.abc import Callable, Coroutine
 from contextlib import asynccontextmanager
@@ -16,6 +17,8 @@ _DEBOUNCE_SECONDS = 2.0
 
 # Queue items are (new_steps, log_path) tuples so consumers know the source file.
 _QueueItem = tuple[list[dict], str]
+
+logger = logging.getLogger(__name__)
 
 
 class LogWatcher:
@@ -52,23 +55,27 @@ class LogWatcher:
             observer = Observer()
             observer.schedule(handler, str(self.log_root), recursive=True)
             observer.start()
+            logger.info("Observer started, watching %s recursively", self.log_root)
 
             yield
 
             observer.stop()
             observer.join()
+            logger.info("Observer stopped")
 
         return lifespan
 
     def handle_log_file_event(self, path: str) -> None:
         now = time.monotonic()
         if now - self._last_events.get(path, 0.0) < _DEBOUNCE_SECONDS:
+            logger.debug("Debounce: skipping %s", path)
             return
         self._last_events[path] = now
 
         try:
             trajectory = parse_jsonl_log(path)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to parse %s: %s", path, exc)
             return
 
         prev = self._seen_counts.get(path, 0)
@@ -77,6 +84,12 @@ class LogWatcher:
             return
 
         self._seen_counts[path] = len(trajectory)
+        logger.info(
+            "Dispatching %d new step(s) from %s to %d subscriber(s)",
+            len(new_steps),
+            path,
+            len(self._subscribers),
+        )
         for q in list(self._subscribers):
             self._main_loop.call_soon_threadsafe(q.put_nowait, (new_steps, path))
 
@@ -99,4 +112,5 @@ class _LogFileEventHandler(FileSystemEventHandler):
         if not path.endswith(".jsonl"):
             return
 
+        logger.debug("File event: %s", path)
         self.watcher.handle_log_file_event(path)

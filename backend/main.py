@@ -1,3 +1,4 @@
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -6,6 +7,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 load_dotenv()
+
+
+def _configure_logging() -> None:
+    level = os.getenv("LOG_LEVEL", "INFO").upper()
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+
+
+_configure_logging()
 
 _cors_origins = [
     o.strip()
@@ -17,6 +30,8 @@ from log_watcher import LogWatcher
 from parser import find_latest_log_file, load_latest_log
 from streaming import TrajectoryStreamer
 from trajectory import MOCK_TRAJECTORY
+
+logger = logging.getLogger(__name__)
 
 watcher = LogWatcher()
 streamer = TrajectoryStreamer()

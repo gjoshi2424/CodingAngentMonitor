@@ -1,10 +1,13 @@
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
 
 _CLAUDE_LOG_ROOT_ENV_VAR = "CLAUDE_LOG_ROOT"
 _DEFAULT_CLAUDE_LOG_ROOT = Path.home() / ".claude" / "projects"
+
+logger = logging.getLogger(__name__)
 
 
 def parse_jsonl_log(file_path: str | Path) -> list[dict[str, Any]]:
@@ -22,6 +25,7 @@ def parse_jsonl_log(file_path: str | Path) -> list[dict[str, Any]]:
             try:
                 entry = json.loads(line)
             except json.JSONDecodeError as exc:
+                logger.warning("Invalid JSON on line %d of %s", line_number, path)
                 raise ValueError(
                     f"Invalid JSON on line {line_number} of {path}"
                 ) from exc

@@ -51,10 +51,6 @@ def _collect_strings(obj) -> list[str]:
     return results
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
 
 def check_rules(step: dict) -> dict:
     """Run all rules against a trajectory step.

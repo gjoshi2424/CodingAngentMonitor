@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 
 import aiosqlite
+
+logger = logging.getLogger(__name__)
 
 _DB_PATH = Path(os.getenv("DB_PATH", "agent_monitor.db"))
 
@@ -61,7 +64,9 @@ async def create_session(source: str, log_path: str | None = None) -> int:
             (source, log_path, _now()),
         )
         await conn.commit()
-        return cursor.lastrowid  # type: ignore[return-value]
+        session_id = cursor.lastrowid
+        logger.debug("Session created: id=%s source=%s", session_id, source)
+        return session_id
 
 
 async def save_step(session_id: int, payload: dict) -> None:
@@ -88,6 +93,7 @@ async def save_step(session_id: int, payload: dict) -> None:
             ),
         )
         await conn.commit()
+    logger.debug("Step saved: session=%s step=%s", session_id, payload["step"])
 
 
 async def close_session(session_id: int) -> None:
@@ -104,6 +110,7 @@ async def close_session(session_id: int) -> None:
             (_now(), session_id, session_id, session_id),
         )
         await conn.commit()
+    logger.debug("Session closed: id=%s", session_id)
 
 
 async def list_sessions() -> list[dict]:

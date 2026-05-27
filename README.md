@@ -15,6 +15,7 @@ flowchart TD
     subgraph Sources["Input Sources"]
         A1["📁 Claude Code\nlog files (.jsonl)"]
         A2["🔄 LogWatcher\n(watchdog + debounce)"]
+        A3["MOCK_TRAJECTORY\n(built-in fixture)"]
         A1 -->|file change event| A2
     end
 
@@ -24,11 +25,10 @@ flowchart TD
 
     A1 -->|/analyze/live| B
     A2 -->|/watch| B
-    A1 -->|/analyze/mock| C0["MOCK_TRAJECTORY\n(built-in fixture)"]
+    A3 -->|/analyze/mock| B
 
     subgraph Pipeline["Analysis Pipeline  ·  streaming.py + monitor.py"]
         direction TB
-        C0 --> D
         B --> D["For each step"]
 
         D --> E{"rules.py\nRule Engine"}

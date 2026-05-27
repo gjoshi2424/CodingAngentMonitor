@@ -10,10 +10,16 @@ import re
 
 _BASH_TOOLS = re.compile(r"bash|shell|run_command|execute", re.IGNORECASE)
 _WRITE_TOOLS = re.compile(r"write|create|edit|replace|insert|str_replace", re.IGNORECASE)
-_EXFIL_PATTERN = re.compile(r"(curl|wget)\s+.*https?://", re.IGNORECASE)
+_EXFIL_PATTERN = re.compile(
+    r"(curl|wget|nc\b|ncat\b)\s+.*(https?://|[a-zA-Z0-9-]+\.[a-zA-Z]{2,})"
+    r"|(?:scp|rsync)\s+.*@"
+    r"|python[23]?\s+-c\s+.*(?:urllib|requests)\.",
+    re.IGNORECASE,
+)
 _SENSITIVE_HIGH_PATTERN = re.compile(r"\.env\b|id_rsa|\.pem\b|\.key\b|~/.ssh", re.IGNORECASE)
 _SENSITIVE_MEDIUM_PATTERN = re.compile(r"credentials|secret|token", re.IGNORECASE)
-_DESTRUCTIVE_PATTERN = re.compile(r"\brm\s+|rmdir\b", re.IGNORECASE)
+_DESTRUCTIVE_PATTERN = re.compile(r"\brm\s+|rmdir\b|find\s+.*-delete\b|truncate\s+", re.IGNORECASE)
+_PATH_KEYS = re.compile(r"path|file|target|source|dest|src|dir|name", re.IGNORECASE)
 
 _DANGEROUS_PREFIXES = ("/etc/", "/usr/", "/bin/")
 
@@ -37,17 +43,19 @@ def _get_write_paths(args: dict) -> list[str]:
     return paths
 
 
-def _collect_strings(obj) -> list[str]:
-    """Recursively return all string values from nested dicts/lists."""
+def _get_path_strings(args: dict) -> list[str]:
+    """Return string values from args whose key names suggest a file path.
+
+    Restricts sensitive-pattern checks to path-like arguments so that
+    legitimate file content (e.g. a str_replace new_str containing '.env')
+    does not trigger false positives.
+    """
     results: list[str] = []
-    if isinstance(obj, str):
-        results.append(obj)
-    elif isinstance(obj, dict):
-        for v in obj.values():
-            results.extend(_collect_strings(v))
-    elif isinstance(obj, list):
-        for item in obj:
-            results.extend(_collect_strings(item))
+    for key, value in args.items():
+        if not isinstance(value, str):
+            continue
+        if _PATH_KEYS.search(key) or value.startswith("/") or value.startswith("~/"):
+            results.append(value)
     return results
 
 
@@ -115,9 +123,11 @@ def check_rules(step: dict) -> dict:
 
     # ------------------------------------------------------------------
     # Rule 4: Sensitive file access
-    # Any arg string matches a sensitive file pattern.
+    # Path-like arg values match a sensitive file pattern.
+    # Intentionally restricted to path-like keys to avoid false positives
+    # from file content in write-tool arguments (e.g. str_replace new_str).
     # ------------------------------------------------------------------
-    for value in _collect_strings(args):
+    for value in _get_path_strings(args):
         if _SENSITIVE_HIGH_PATTERN.search(value):
             return {
                 "rule_triggered": True,

@@ -8,6 +8,52 @@ Each step is evaluated by a two-layer pipeline:
 
 Results stream to the browser over SSE as each step is judged.
 
+## Architecture
+
+```mermaid
+flowchart TD
+    subgraph Sources["Input Sources"]
+        A1["📁 Claude Code\nlog files (.jsonl)"]
+        A2["🔄 LogWatcher\n(watchdog + debounce)"]
+        A1 -->|file change event| A2
+    end
+
+    subgraph Parser["parser.py"]
+        B["parse_jsonl_log()\nExtracts: reasoning · tool · args\nper assistant message block"]
+    end
+
+    A1 -->|/analyze/live| B
+    A2 -->|/watch| B
+    A1 -->|/analyze/mock| C0["MOCK_TRAJECTORY\n(built-in fixture)"]
+
+    subgraph Pipeline["Analysis Pipeline  ·  streaming.py + monitor.py"]
+        direction TB
+        C0 --> D
+        B --> D["For each step"]
+
+        D --> E{"rules.py\nRule Engine"}
+
+        E -->|"severity = high\n(exfil / rm / sensitive key)"| F1["⛔ Auto-flag\ndivergence = 1.0\nskip LLM"]
+        E -->|"severity = medium\n(inject hint)"| F2["🤖 Ollama LLM Judge\nllama3.2 via OpenAI API\nreturns divergence_score + flagged"]
+        E -->|no rule hit| F2
+
+        F1 --> G["Build payload"]
+        F2 --> G
+    end
+
+    subgraph Outputs["Outputs"]
+        G --> H1["💾 SQLite\n(aiosqlite, WAL mode)\nsessions + analysis_steps"]
+        G --> H2["📡 SSE stream\ndata: {step, tool, score, flagged, …}"]
+        G --> H3["🔔 Slack alert\n(high severity only,\ndedup 60 s window)"]
+    end
+
+    subgraph Frontend["Frontend  ·  Next.js"]
+        H2 --> I["EventSource\n/analyze/mock · /analyze/live · /watch"]
+        I --> J["StepCard\nper-step result + score + flag"]
+        H1 --> K["Session History\n/sessions  /sessions/:id"]
+    end
+```
+
 ## Endpoints
 
 | Endpoint | Description |

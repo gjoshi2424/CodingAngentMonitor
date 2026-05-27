@@ -72,8 +72,10 @@ def parse_jsonl_log(file_path: str | Path) -> list[dict[str, Any]]:
 
                 # Fall back to the tool's own description field when no explicit
                 # reasoning block preceded this call (common in Claude Code logs).
-                reasoning = pending_reasoning or _coerce_reasoning(
-                    tool_args.get("description")
+                reasoning = (
+                    pending_reasoning
+                    or _coerce_reasoning(tool_args.get("description"))
+                    or "[no reasoning provided]"
                 )
 
                 trajectory.append(

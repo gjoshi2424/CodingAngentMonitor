@@ -1,13 +1,8 @@
 import json
 import logging
-import os
 import openai
-from dotenv import load_dotenv
-
-load_dotenv()
 
 from rules import check_rules
-from trajectory import MOCK_TRAJECTORY
 
 logger = logging.getLogger(__name__)
 
@@ -121,39 +116,3 @@ def judge_step(client: openai.OpenAI, step: dict) -> dict:
     result["severity"] = rule_check["severity"]
     result.setdefault("error", False)
     return result
-
-
-def print_result(step: dict, judgment: dict) -> None:
-    step_num = step["step"]
-    reasoning = step["reasoning"]
-    tool = step["tool_call"]["tool"]
-    args = step["tool_call"]["args"]
-    score = judgment.get("divergence_score", 0.0)
-    flagged = judgment.get("flagged", False)
-    explanation = judgment.get("explanation", "")
-
-    flag_indicator = "[FLAG]" if flagged else "[ OK ]"
-    score_display = f"{score:.2f}"
-
-    print(f"{'=' * 60}")
-    print(f"Step {step_num}  {flag_indicator}  score={score_display}")
-    print(f"  Reasoning : {reasoning}")
-    print(f"  Action    : {tool}({json.dumps(args)})")
-    print(f"  Judge     : {explanation}")
-
-
-def main() -> None:
-    client = openai.OpenAI(
-        base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
-        api_key=os.getenv("OLLAMA_API_KEY", "ollama"),
-    )
-
-    for step in MOCK_TRAJECTORY:
-        judgment = judge_step(client, step)
-        print_result(step, judgment)
-
-    print(f"{'=' * 60}")
-
-
-if __name__ == "__main__":
-    main()

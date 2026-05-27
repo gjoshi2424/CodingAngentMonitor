@@ -6,7 +6,16 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+import db
+from log_watcher import LogWatcher
+from parser import find_latest_log_file, load_latest_log
+from streaming import TrajectoryStreamer
+from trajectory import MOCK_TRAJECTORY
 
+logger = logging.getLogger(__name__)
+
+watcher = LogWatcher()
+streamer = TrajectoryStreamer()
 load_dotenv()
 
 
@@ -52,17 +61,6 @@ async def require_api_key(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-import db
-from log_watcher import LogWatcher
-from parser import find_latest_log_file, load_latest_log
-from streaming import TrajectoryStreamer
-from trajectory import MOCK_TRAJECTORY
-
-logger = logging.getLogger(__name__)
-
-watcher = LogWatcher()
-streamer = TrajectoryStreamer()
-
 
 def create_app() -> FastAPI:
     app = FastAPI(lifespan=watcher.create_lifespan(on_startup=db.init_db))
@@ -87,8 +85,12 @@ def create_app() -> FastAPI:
 
     @app.get("/analyze/live", dependencies=[Depends(require_api_key)])
     async def analyze_live():
-        log_path = str(find_latest_log_file())
-        trajectory = load_latest_log()
+        try:
+            log_path = str(find_latest_log_file())
+            trajectory = load_latest_log()
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="No .jsonl logs found")
+
         return StreamingResponse(
             streamer.stream_steps(trajectory, source="live", log_path=log_path),
             media_type="text/event-stream",

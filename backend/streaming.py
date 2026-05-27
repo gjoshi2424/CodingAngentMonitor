@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 
 import openai
 
@@ -14,7 +15,8 @@ logger = logging.getLogger(__name__)
 class TrajectoryStreamer:
     def __init__(self):
         self.client = openai.OpenAI(
-            base_url="http://localhost:11434/v1", api_key="ollama"
+            base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+            api_key=os.getenv("OLLAMA_API_KEY", "ollama"),
         )
         self.alert_manager = AlertManager()
 

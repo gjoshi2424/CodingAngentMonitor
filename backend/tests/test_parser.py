@@ -230,6 +230,87 @@ class ParseJsonlLogTests(unittest.TestCase):
                 ],
             )
 
+    def test_non_assistant_entries_are_ignored(self) -> None:
+        log_entries = [
+            {
+                "type": "user",
+                "message": {"content": [{"type": "text", "text": "Do something."}]},
+                "timestamp": "2026-05-23T10:00:00Z",
+                "uuid": "1",
+            },
+            {
+                "type": "system",
+                "message": {"content": "system prompt"},
+                "timestamp": "2026-05-23T10:00:01Z",
+                "uuid": "2",
+            },
+        ]
+
+        steps = parse_jsonl_log(self._write_log(log_entries))
+
+        self.assertEqual(steps, [])
+
+    def test_text_block_used_as_reasoning_when_no_thinking(self) -> None:
+        log_entries = [
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {"type": "text", "text": "I will read the file now."},
+                        {
+                            "type": "tool_use",
+                            "name": "Read",
+                            "input": {"path": "foo.py"},
+                        },
+                    ]
+                },
+                "timestamp": "2026-05-23T10:00:00Z",
+                "uuid": "1",
+            }
+        ]
+
+        steps = parse_jsonl_log(self._write_log(log_entries))
+
+        self.assertEqual(len(steps), 1)
+        self.assertEqual(steps[0]["reasoning"], "I will read the file now.")
+
+    def test_thinking_takes_precedence_over_text_block(self) -> None:
+        log_entries = [
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {"type": "thinking", "thinking": "Deep thought here"},
+                        {"type": "text", "text": "Surface text here"},
+                        {
+                            "type": "tool_use",
+                            "name": "Read",
+                            "input": {"path": "bar.py"},
+                        },
+                    ]
+                },
+                "timestamp": "2026-05-23T10:00:00Z",
+                "uuid": "1",
+            }
+        ]
+
+        steps = parse_jsonl_log(self._write_log(log_entries))
+
+        self.assertEqual(steps[0]["reasoning"], "Deep thought here")
+
+    def test_empty_file_returns_no_steps(self) -> None:
+        steps = parse_jsonl_log(self._write_log([]))
+        self.assertEqual(steps, [])
+
+    def test_invalid_json_line_raises_value_error(self) -> None:
+        tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tmpdir.cleanup)
+        path = Path(tmpdir.name) / "bad.jsonl"
+        path.write_text("not-valid-json\n", encoding="utf-8")
+
+        with self.assertRaises(ValueError):
+            parse_jsonl_log(path)
+
     def _write_log(self, entries: list[dict]) -> Path:
         tmpdir = tempfile.TemporaryDirectory()
         self.addCleanup(tmpdir.cleanup)

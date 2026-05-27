@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import openai
 from dotenv import load_dotenv
 
@@ -142,7 +143,10 @@ def print_result(step: dict, judgment: dict) -> None:
 
 
 def main() -> None:
-    client = openai.OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+    client = openai.OpenAI(
+        base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+        api_key=os.getenv("OLLAMA_API_KEY", "ollama"),
+    )
 
     for step in MOCK_TRAJECTORY:
         judgment = judge_step(client, step)

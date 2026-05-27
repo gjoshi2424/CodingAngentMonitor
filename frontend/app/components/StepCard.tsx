@@ -1,4 +1,4 @@
-import { StepResult } from "./types";
+import { StepResult } from "../types";
 
 interface StepCardProps {
   result: StepResult;
